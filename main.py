@@ -5,6 +5,7 @@ from typing import Optional
 from src.mempool_monitor import MempoolMonitor
 from src.attack_detector import AttackDetector
 from src.telegram_bot import MEVProtectionBot
+from src.multichain_monitor import MultiChainMonitor
 from src.web_dashboard import app as dashboard_app
 from config import Config
 import uvicorn
@@ -18,6 +19,7 @@ class MEVProtectionSystem:
         self.demo_mode = demo_mode
         
         self.attack_detector = AttackDetector(alert_callback=self.on_attack_detected)
+        self.multichain_monitor = MultiChainMonitor(on_transaction_callback=self.on_transaction)
         
         if not demo_mode:
             self.mempool_monitor = MempoolMonitor(on_transaction_callback=self.on_transaction)
@@ -160,6 +162,9 @@ class MEVProtectionSystem:
             try:
                 print("🔍 Simulating mempool monitoring...")
                 await self.attack_detector.simulate_attack_detection()
+                
+                print("🌐 Simulating multi-chain attack...")
+                await self.multichain_monitor.simulate_multichain_attack()
                 
                 await asyncio.sleep(30)  # Simulate attack every 30 seconds
                 
