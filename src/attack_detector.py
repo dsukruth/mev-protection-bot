@@ -1,11 +1,12 @@
 import asyncio
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Callable
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from src.utils.database import Database
 from src.utils.price_feeds import PriceFeed
 from config import Config
+from src.ml_detector import MLAttackDetector
 
 @dataclass
 class PendingTransaction:
@@ -28,13 +29,17 @@ class SandwichAttack:
     estimated_victim_loss: float
     confidence_score: float
     attack_type: str = "sandwich"
+    chain: str = "ethereum"
+    ml_score: float = 0.0
+    risk_level: str = "UNKNOWN"
 
 class AttackDetector:
-    def __init__(self, alert_callback: callable = None):
+    def __init__(self, alert_callback: Optional[Callable] = None):
         self.config = Config()
         self.db = Database()
         self.price_feed = PriceFeed()
         self.alert_callback = alert_callback
+        self.ml_detector = MLAttackDetector()
         
         self.pending_transactions = deque(maxlen=1000)  # Keep last 1000 transactions
         self.token_pair_transactions = defaultdict(list)  # Group by token pair
@@ -224,14 +229,19 @@ class AttackDetector:
             
             confidence = self._calculate_confidence_score(front_run, victim, back_run, profit)
             
-            if profit > self.min_profit_threshold and victim_loss > self.config.MIN_LOSS_THRESHOLD:
+            ml_analysis = self.ml_detector.analyze_transaction_ml(victim.decoded_data)
+            
+            if profit > self.min_profit_threshold and victim_loss > 50:
                 return SandwichAttack(
                     victim_tx=victim,
                     front_run_tx=front_run,
                     back_run_tx=back_run,
                     estimated_profit=profit,
                     estimated_victim_loss=victim_loss,
-                    confidence_score=confidence
+                    confidence_score=confidence,
+                    chain="ethereum",
+                    ml_score=ml_analysis['ml_score'],
+                    risk_level=ml_analysis['risk_level']
                 )
             
             return None
